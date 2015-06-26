@@ -100,7 +100,14 @@ request modify opts url act = run (manager opts) act =<< prepare modify opts url
 
 run :: Mgr -> (Response BodyReader -> IO a) -> Request -> IO a
 run emgr act req = either (flip HTTP.withManager go) go emgr
-  where go mgr = HTTP.withResponse req mgr act
+  where go mgr = HTTP.withResponseHistory req mgr act'
+        act' historyResponse = act response
+          where
+            origResponse    = HTTP.hrFinalResponse historyResponse
+            finalRequestUrl = Char8.pack . show . HTTP.getUri $ HTTP.hrFinalRequest historyResponse
+            origHeaders     = responseHeaders origResponse
+            newHeaders      = ("X-Wreq-Final-Request-URI", finalRequestUrl):origHeaders
+            response        = origResponse { responseHeaders = newHeaders }
 
 prepare :: (Request -> IO Request) -> Options -> String -> IO Request
 prepare modify opts url = do
